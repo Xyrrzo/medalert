@@ -1,0 +1,25 @@
+<!-- ============================================================
+     Paste these INSIDE the <manifest> tag of
+     android/app/src/main/AndroidManifest.xml
+     (the two <uses-permission> lines go right after the opening
+     <manifest ...> line; the receivers go INSIDE the <application> tag)
+     ============================================================ -->
+
+<!-- Permissions: paste directly under the opening <manifest> tag -->
+<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+<uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+
+<!-- Receivers: paste INSIDE the <application> ... </application> tag,
+     right after the closing </activity> tag -->
+<receiver
+    android:exported="false"
+    android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
+<receiver
+    android:exported="false"
+    android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+    <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+    </intent-filter>
+</receiver>
