@@ -31,6 +31,7 @@ class _SchedulePageState extends State<SchedulePage> {
   void dispose() {
     _nameCtrl.dispose();
     _notesCtrl.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
@@ -40,7 +41,17 @@ class _SchedulePageState extends State<SchedulePage> {
       content: const Text('The appointment will be marked as cancelled.'),
       actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep it')), FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Cancel appointment'))],
     ));
-    if (confirmed == true) await _controller.cancel(appointmentId);
+    if (confirmed != true || !mounted) return;
+    final cancelled = await _controller.cancel(appointmentId);
+    if (!mounted) return;
+    if (!cancelled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_controller.error ?? 'The appointment could not be cancelled.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Future<void> _pickDate() async {
@@ -50,12 +61,12 @@ class _SchedulePageState extends State<SchedulePage> {
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 90)),
     );
-    if (picked != null) setState(() => _selectedDate = picked);
+    if (picked != null && mounted) setState(() => _selectedDate = picked);
   }
 
   Future<void> _pickTime() async {
     final picked = await showTimePicker(context: context, initialTime: _selectedTime);
-    if (picked != null) setState(() => _selectedTime = picked);
+    if (picked != null && mounted) setState(() => _selectedTime = picked);
   }
 
   Future<void> _book() async {

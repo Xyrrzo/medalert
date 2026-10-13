@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../models/health_tool_entry.dart';
 import '../services/health_records_service.dart';
 
 /// A collection of lightweight, account-synced tools for everyday health tracking.
@@ -14,7 +15,7 @@ class HealthToolsPage extends StatefulWidget {
 class _HealthToolsPageState extends State<HealthToolsPage> {
   final _records = HealthRecordsService.instance;
   Map<String, String> _profiles = {};
-  Map<String, List<Map<String, dynamic>>> _entries = {};
+  Map<String, List<HealthToolEntry>> _entries = {};
   bool _loadingRecords = true;
   String? _recordsError;
   int _water = 0;
@@ -45,7 +46,9 @@ class _HealthToolsPageState extends State<HealthToolsPage> {
   @override
   void initState() {
     super.initState();
-    _loadRecords();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadRecords();
+    });
   }
 
   String _waterKey(DateTime date) => 'water_${date.year}_${date.month}_${date.day}';
@@ -68,7 +71,7 @@ class _HealthToolsPageState extends State<HealthToolsPage> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _recordsError = error.toString();
+        _recordsError = _friendlyError(error);
         _loadingRecords = false;
       });
     }
@@ -77,15 +80,6 @@ class _HealthToolsPageState extends State<HealthToolsPage> {
   Future<bool> _saveProfile(String key, String value) async {
     try {
       await _records.saveProfile(key, value);
-      if (mounted) {
-        setState(() {
-          if (value.isEmpty) {
-            _profiles.remove(key);
-          } else {
-            _profiles[key] = value;
-          }
-        });
-      }
       return true;
     } catch (error) {
       _showSaveError(error);
@@ -96,8 +90,6 @@ class _HealthToolsPageState extends State<HealthToolsPage> {
   Future<bool> _addRecord(String key, String value) async {
     try {
       await _records.addEntry(key, value);
-      final snapshot = await _records.load();
-      if (mounted) setState(() => _entries = snapshot.entries);
       return true;
     } catch (error) {
       _showSaveError(error);
@@ -105,27 +97,66 @@ class _HealthToolsPageState extends State<HealthToolsPage> {
     }
   }
 
+  void _applyProfile(String key, String value) {
+    if (!mounted) return;
+    setState(() {
+      if (value.isEmpty) {
+        _profiles.remove(key);
+      } else {
+        _profiles[key] = value;
+      }
+    });
+  }
+
+  void _applyEntry(String key, String value) {
+    if (!mounted) return;
+    setState(() {
+      final entry = HealthToolEntry(
+        id: null,
+        userId: '',
+        toolKey: key,
+        value: value,
+        createdAt: DateTime.now().toUtc(),
+      );
+      _entries = {..._entries, key: [entry, ...?_entries[key]]};
+    });
+  }
+
   void _showSaveError(Object error) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not save record: $error')),
+        SnackBar(content: Text('Could not save record. ${_friendlyError(error)}')),
       );
     }
   }
 
-  List<String> _recentEntries(String key) => (_entries[key] ?? const <Map<String, dynamic>>[])
+  String _friendlyError(Object error) {
+    final message = error.toString().toLowerCase();
+    if (message.contains('user_health_profiles') ||
+        message.contains('user_health_entries') ||
+        message.contains('health_data') ||
+        message.contains('schema cache') ||
+        message.contains('does not exist')) {
+      return 'Add a JSONB health_data column to the profiles table in Supabase Table Editor, then retry.';
+    }
+    if (message.contains('timed out')) return 'Supabase did not respond in time. Check your connection and retry.';
+    if (message.contains('sign in')) return 'Sign in again to load your health records.';
+    return 'Please check your connection and try again.';
+  }
+
+  List<String> _recentEntries(String key) => (_entries[key] ?? const <HealthToolEntry>[])
       .take(5)
       .map((row) {
-        final date = DateTime.tryParse(row['created_at']?.toString() ?? '')?.toLocal();
-        final dateLabel = date == null ? '' : ' • ${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-        return '${row['value']}$dateLabel';
+        final date = row.createdAt.toLocal();
+        final dateLabel = ' • ${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+        return '${row.value}$dateLabel';
       })
       .toList();
 
   String? _latestEntry(String key) {
     final rows = _entries[key];
     if (rows == null || rows.isEmpty) return null;
-    return rows.first['value']?.toString();
+    return rows.first.value;
   }
 
   Future<void> _openTool(_HealthTool tool) async {
@@ -159,32 +190,42 @@ class _HealthToolsPageState extends State<HealthToolsPage> {
   Future<void> _showWaterTracker() async {
     final now = DateTime.now();
     final key = _waterKey(now);
+    var saving = false;
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+        builder: (dialogContext, setDialogState) => AlertDialog(
           title: const Text('Water tracker'),
           content: Column(mainAxisSize: MainAxisSize.min, children: [
             const Icon(Icons.water_drop, size: 44, color: Colors.blue),
             const SizedBox(height: 8),
-            Text('$_water glasses today', style: Theme.of(context).textTheme.titleLarge),
+            Text('$_water glasses today', style: Theme.of(dialogContext).textTheme.titleLarge),
+            if (saving) const Padding(padding: EdgeInsets.only(top: 12), child: LinearProgressIndicator()),
             const SizedBox(height: 16),
             Wrap(spacing: 8, children: [
               OutlinedButton.icon(
-                onPressed: _water == 0 ? null : () async {
+                onPressed: _water == 0 || saving ? null : () async {
+                  setDialogState(() => saving = true);
                   final count = _water > 0 ? _water - 1 : 0;
-                  if (!await _saveProfile(key, count.toString())) return;
+                  final saved = await _saveProfile(key, count.toString());
+                  if (!dialogContext.mounted) return;
+                  setDialogState(() => saving = false);
+                  if (!saved) return;
+                  _applyProfile(key, count.toString());
                   if (mounted) setState(() => _water = count);
-                  setDialogState(() {});
                 },
                 icon: const Icon(Icons.remove), label: const Text('Undo glass'),
               ),
               FilledButton.icon(
-                onPressed: () async {
+                onPressed: saving ? null : () async {
+                  setDialogState(() => saving = true);
                   final count = _water + 1;
-                  if (!await _saveProfile(key, count.toString())) return;
+                  final saved = await _saveProfile(key, count.toString());
+                  if (!dialogContext.mounted) return;
+                  setDialogState(() => saving = false);
+                  if (!saved) return;
+                  _applyProfile(key, count.toString());
                   if (mounted) setState(() => _water = count);
-                  setDialogState(() {});
                 },
                 icon: const Icon(Icons.add), label: const Text('Add glass'),
               ),
@@ -199,9 +240,12 @@ class _HealthToolsPageState extends State<HealthToolsPage> {
   Future<void> _editWeightLog() async {
     final controller = TextEditingController();
     final entries = _recentEntries('weight');
-    final saved = await showDialog<String>(
+    String? savedValue;
+    var saving = false;
+    final saved = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
         title: const Text('Weight log'),
         scrollable: true,
         content: Column(
@@ -211,6 +255,7 @@ class _HealthToolsPageState extends State<HealthToolsPage> {
             TextField(
               controller: controller,
               autofocus: true,
+              enabled: !saving,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               decoration: const InputDecoration(
                 labelText: 'Weight (kg)',
@@ -218,6 +263,7 @@ class _HealthToolsPageState extends State<HealthToolsPage> {
                 border: OutlineInputBorder(),
               ),
             ),
+            if (saving) const Padding(padding: EdgeInsets.only(top: 12), child: LinearProgressIndicator()),
             if (entries.isNotEmpty) ...[
               const SizedBox(height: 20),
               const Text('Recent entries', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -232,30 +278,38 @@ class _HealthToolsPageState extends State<HealthToolsPage> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
             child: const Text('Close'),
           ),
           FilledButton.icon(
-            onPressed: () {
+            onPressed: saving ? null : () async {
               final weight = double.tryParse(controller.text.trim().replaceAll(',', '.'));
               if (weight == null || weight <= 0) {
-                ScaffoldMessenger.of(context).showSnackBar(
+                ScaffoldMessenger.of(dialogContext).showSnackBar(
                   const SnackBar(content: Text('Enter a valid weight in kilograms.')),
                 );
                 return;
               }
-              Navigator.of(dialogContext).pop('${weight.toString()} kg');
+              setDialogState(() => saving = true);
+              final value = '${weight.toString()} kg';
+              final success = await _addRecord('weight', value);
+              if (!dialogContext.mounted) return;
+              setDialogState(() => saving = false);
+              if (success) {
+                savedValue = value;
+                Navigator.of(dialogContext).pop(true);
+              }
             },
             icon: const Icon(Icons.add),
             label: const Text('Add entry'),
           ),
         ],
+        ),
       ),
     );
     controller.dispose();
-    if (saved == null) return;
-    if (!await _addRecord('weight', saved)) return;
-    if (mounted) {
+    if (saved == true && mounted) {
+      _applyEntry('weight', savedValue!);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Weight entry saved.')),
       );
@@ -266,9 +320,12 @@ class _HealthToolsPageState extends State<HealthToolsPage> {
     final isLog = const {'blood_pressure', 'glucose', 'temperature', 'pulse', 'symptoms', 'vaccines'}.contains(tool.id);
     final entries = _recentEntries(tool.id);
     final controller = TextEditingController(text: isLog ? '' : (_profiles[tool.id] ?? ''));
-    final value = await showDialog<String>(
+    String? savedValue;
+    var saving = false;
+    final saved = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
         title: Text(tool.title),
         scrollable: true,
         content: Column(
@@ -278,11 +335,13 @@ class _HealthToolsPageState extends State<HealthToolsPage> {
             TextField(
               controller: controller,
               autofocus: true,
+              enabled: !saving,
               minLines: 1,
               maxLines: 4,
               keyboardType: TextInputType.text,
               decoration: InputDecoration(hintText: _hintFor(tool.id), border: const OutlineInputBorder()),
             ),
+            if (saving) const Padding(padding: EdgeInsets.only(top: 12), child: LinearProgressIndicator()),
             if (isLog && entries.isNotEmpty) ...[
               const SizedBox(height: 16),
               const Text('Recent entries', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -293,23 +352,39 @@ class _HealthToolsPageState extends State<HealthToolsPage> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
-          FilledButton(onPressed: () => Navigator.pop(context, controller.text.trim()), child: Text(isLog ? 'Add entry' : 'Save')),
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Close')),
+          FilledButton(
+            onPressed: saving ? null : () async {
+              final value = controller.text.trim();
+              if (isLog && value.isEmpty) {
+                ScaffoldMessenger.of(dialogContext).showSnackBar(const SnackBar(content: Text('Enter a value before adding the entry.')));
+                return;
+              }
+              setDialogState(() => saving = true);
+              final success = isLog
+                  ? await _addRecord(tool.id, value)
+                  : await _saveProfile(tool.id, value);
+              if (!dialogContext.mounted) return;
+              setDialogState(() => saving = false);
+              if (success) {
+                savedValue = value;
+                Navigator.of(dialogContext).pop(true);
+              }
+            },
+            child: Text(isLog ? 'Add entry' : 'Save'),
+          ),
         ],
+        ),
       ),
     );
     controller.dispose();
-    if (value != null) {
-      if (isLog && value.isNotEmpty) {
-        if (!await _addRecord(tool.id, value)) return;
-      } else if (!isLog) {
-        if (!await _saveProfile(tool.id, value)) return;
+    if (saved == true && mounted) {
+      if (isLog) {
+        _applyEntry(tool.id, savedValue!);
+      } else {
+        _applyProfile(tool.id, savedValue!);
       }
-      if (mounted) {
-        if (isLog && value.isNotEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Entry saved.')));
-        }
-      }
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(isLog ? 'Entry saved.' : 'Saved ${tool.title.toLowerCase()}.')));
     }
   }
 
@@ -336,18 +411,21 @@ class _HealthToolsPageState extends State<HealthToolsPage> {
     final height = TextEditingController();
     final weight = TextEditingController();
     String? result;
+    String? savedValue;
+    var saving = false;
     await showDialog<void>(
       context: context,
-      builder: (context) => StatefulBuilder(builder: (context, setDialogState) => AlertDialog(
+      builder: (dialogContext) => StatefulBuilder(builder: (dialogContext, setDialogState) => AlertDialog(
         title: const Text('BMI calculator'),
         scrollable: true,
         content: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(controller: height, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Height (cm)')),
-          TextField(controller: weight, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Weight (kg)')),
+          TextField(enabled: !saving, controller: height, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Height (cm)')),
+          TextField(enabled: !saving, controller: weight, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Weight (kg)')),
           if (result != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(result!, style: const TextStyle(fontWeight: FontWeight.bold))),
+          if (saving) const Padding(padding: EdgeInsets.only(top: 12), child: LinearProgressIndicator()),
           const Padding(padding: EdgeInsets.only(top: 12), child: Text('BMI is a rough screening measure, not a diagnosis.', style: TextStyle(fontSize: 12))),
         ]),
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')), FilledButton(onPressed: () async {
+        actions: [TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Close')), FilledButton(onPressed: saving ? null : () async {
           final h = double.tryParse(height.text.replaceAll(',', '.'));
           final w = double.tryParse(weight.text.replaceAll(',', '.'));
           if (h == null || w == null || h <= 0 || w <= 0) {
@@ -355,13 +433,21 @@ class _HealthToolsPageState extends State<HealthToolsPage> {
             return;
           }
           final bmi = w / ((h / 100) * (h / 100));
-          final saved = await _addRecord('bmi', 'BMI ${bmi.toStringAsFixed(1)} • ${h.toString()} cm • ${w.toString()} kg');
-          setDialogState(() => result = saved ? 'BMI: ${bmi.toStringAsFixed(1)} (saved to your records)' : 'Could not save this result.');
+          final value = 'BMI ${bmi.toStringAsFixed(1)} • ${h.toString()} cm • ${w.toString()} kg';
+          setDialogState(() => saving = true);
+          final saved = await _addRecord('bmi', value);
+          if (!dialogContext.mounted) return;
+          setDialogState(() {
+            saving = false;
+            result = saved ? 'BMI: ${bmi.toStringAsFixed(1)} (saved to your records)' : 'Could not save this result.';
+          });
+          if (saved) savedValue = value;
         }, child: const Text('Calculate'))],
       )),
     );
     height.dispose();
     weight.dispose();
+    if (savedValue != null) _applyEntry('bmi', savedValue);
   }
 
   Future<void> _showDueDate() async {
@@ -370,12 +456,34 @@ class _HealthToolsPageState extends State<HealthToolsPage> {
     final due = picked.add(const Duration(days: 280));
     final periodDate = '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
     final dueDate = '${due.year}-${due.month.toString().padLeft(2, '0')}-${due.day.toString().padLeft(2, '0')}';
-    if (!await _addRecord('pregnancy', 'Last period: $periodDate • Estimated due date: $dueDate')) return;
-    await showDialog<void>(context: context, builder: (context) => AlertDialog(
-      title: const Text('Estimated due date'),
-      content: Text('${due.day}/${due.month}/${due.year}\n\nThis estimate uses 280 days from the first day of the last menstrual period. A health professional can provide a more accurate estimate.'),
-      actions: [FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Done'))],
-    ));
+    final value = 'Last period: $periodDate • Estimated due date: $dueDate';
+    var saving = false;
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+            title: const Text('Estimated due date'),
+            content: Column(mainAxisSize: MainAxisSize.min, children: [
+              Text('${due.day}/${due.month}/${due.year}\n\nThis estimate uses 280 days from the first day of the last menstrual period. A health professional can provide a more accurate estimate.'),
+              if (saving) const Padding(padding: EdgeInsets.only(top: 12), child: LinearProgressIndicator()),
+            ]),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Close')),
+              FilledButton(onPressed: saving ? null : () async {
+                setDialogState(() => saving = true);
+                final success = await _addRecord('pregnancy', value);
+                if (!dialogContext.mounted) return;
+                setDialogState(() => saving = false);
+                if (success) Navigator.of(dialogContext).pop(true);
+              }, child: const Text('Save date')),
+            ],
+        ),
+      ),
+    );
+    if (saved == true && mounted) {
+      _applyEntry('pregnancy', value);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Due date saved.')));
+    }
   }
 
   Future<void> _showFirstAid() => showDialog<void>(context: context, builder: (context) => AlertDialog(
@@ -396,8 +504,12 @@ class _HealthToolsPageState extends State<HealthToolsPage> {
       final history = _recentEntries(tool.id);
       if (history.isNotEmpty) lines.add('${tool.title} history:\n${history.join('\n')}');
     }
-    await Clipboard.setData(ClipboardData(text: lines.join('\n')));
-    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saved health notes copied to clipboard.')));
+    try {
+      await Clipboard.setData(ClipboardData(text: lines.join('\n')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saved health notes copied to clipboard.')));
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not copy the summary on this device.')));
+    }
   }
 
   @override
