@@ -12,7 +12,6 @@ class EmergencyPage extends StatefulWidget {
 class _EmergencyPageState extends State<EmergencyPage> {
   final _controller = EmergencyController();
 
-  
   static const String healthUnitHotline = '09171234567';
   static const String barangayEmergencyLine = '911';
 
@@ -66,7 +65,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
                   decoration: AppConstants.gradientBox(radius: 95).copyWith(
                     boxShadow: [
                       BoxShadow(
-                        color: AppConstants.redPrimary.withOpacity(0.5),
+                        color: AppConstants.redPrimary.withValues(alpha: 0.5),
                         blurRadius: 32,
                         spreadRadius: 6,
                       ),
@@ -74,13 +73,17 @@ class _EmergencyPageState extends State<EmergencyPage> {
                   ),
                   child: const Center(
                     child: Text('SOS',
-                        style: TextStyle(color: Colors.white, fontSize: 44, fontWeight: FontWeight.bold)),
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 44,
+                            fontWeight: FontWeight.bold)),
                   ),
                 ),
               ),
             ),
             const SizedBox(height: 24),
-            const Text('Quick symptom check (optional):', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text('Quick symptom check (optional):',
+                style: TextStyle(fontWeight: FontWeight.bold)),
             ..._symptoms.keys.map(
               (k) => CheckboxListTile(
                 dense: true,
@@ -93,9 +96,12 @@ class _EmergencyPageState extends State<EmergencyPage> {
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
               initialValue: _severity,
-              decoration: const InputDecoration(labelText: 'Severity', border: OutlineInputBorder()),
+              decoration: const InputDecoration(
+                  labelText: 'Severity', border: OutlineInputBorder()),
               items: const ['mild', 'moderate', 'severe']
-                  .map((s) => DropdownMenuItem(value: s, child: Text(s[0].toUpperCase() + s.substring(1))))
+                  .map((s) => DropdownMenuItem(
+                      value: s,
+                      child: Text(s[0].toUpperCase() + s.substring(1))))
                   .toList(),
               onChanged: (v) => setState(() => _severity = v!),
             ),
@@ -103,7 +109,8 @@ class _EmergencyPageState extends State<EmergencyPage> {
             TextField(
               controller: _notesCtrl,
               maxLines: 2,
-              decoration: const InputDecoration(labelText: 'Additional notes', border: OutlineInputBorder()),
+              decoration: const InputDecoration(
+                  labelText: 'Additional notes', border: OutlineInputBorder()),
             ),
             const SizedBox(height: 16),
             OutlinedButton.icon(
@@ -111,9 +118,10 @@ class _EmergencyPageState extends State<EmergencyPage> {
                 foregroundColor: AppConstants.redPrimary,
                 side: const BorderSide(color: AppConstants.redPrimary),
               ),
-              onPressed: () => _controller.callEmergencyLine(barangayEmergencyLine),
+              onPressed: () =>
+                  _controller.callEmergencyLine(barangayEmergencyLine),
               icon: const Icon(Icons.call),
-              label: const Text('Call Barangay Emergency Line'),
+              label: const Text('Call Local Emergency Line'),
             ),
           ],
         );

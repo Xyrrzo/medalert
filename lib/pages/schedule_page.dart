@@ -18,12 +18,29 @@ class _SchedulePageState extends State<SchedulePage> {
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   TimeOfDay _selectedTime = const TimeOfDay(hour: 9, minute: 0);
   String _selectedType = AppConstants.appointmentTypes.first;
+  String _statusFilter = 'all';
   int? _selectedUnitId;
 
   @override
   void initState() {
     super.initState();
     _controller.loadData();
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _notesCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _confirmCancel(int appointmentId) async {
+    final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Cancel appointment?'),
+      content: const Text('The appointment will be marked as cancelled.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep it')), FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Cancel appointment'))],
+    ));
+    if (confirmed == true) await _controller.cancel(appointmentId);
   }
 
   Future<void> _pickDate() async {
@@ -68,7 +85,7 @@ class _SchedulePageState extends State<SchedulePage> {
 
     if (ok) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Appointment booked successfully!')),
+        const SnackBar(content: Text('Appointment request submitted. It is pending staff review.')),
       );
       _nameCtrl.clear();
       _notesCtrl.clear();
@@ -166,6 +183,7 @@ class _SchedulePageState extends State<SchedulePage> {
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: Text('Appointments', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             ),
+            Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 4), child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [for (final status in ['all', 'pending', 'confirmed', 'completed', 'rejected', 'cancelled']) Padding(padding: const EdgeInsets.only(right: 6), child: ChoiceChip(label: Text(status == 'all' ? 'All' : status[0].toUpperCase() + status.substring(1)), selected: _statusFilter == status, onSelected: (_) => setState(() => _statusFilter = status)))]))),
             if (_controller.isLoading)
               const Padding(
                 padding: EdgeInsets.all(24),
@@ -187,18 +205,18 @@ class _SchedulePageState extends State<SchedulePage> {
                   ),
                 ),
               )
-            else if (_controller.appointments.isEmpty)
+            else if (_controller.appointments.where((a) => _statusFilter == 'all' || a.status == _statusFilter).isEmpty)
               const Padding(
                 padding: EdgeInsets.all(24),
-                child: Center(child: Text('No appointments yet.')),
+                child: Center(child: Text('No appointments match this filter.')),
               )
             else
-              ..._controller.appointments.map(
+              ..._controller.appointments.where((a) => _statusFilter == 'all' || a.status == _statusFilter).map(
                 (a) => AppointmentCard(
                   appointment: a,
-                  onCancel: a.status == 'cancelled'
+                  onCancel: !{'pending', 'confirmed'}.contains(a.status)
                       ? null
-                      : () => _controller.cancel(a.id),
+                      : () => _confirmCancel(a.id),
                 ),
               ),
           ],

@@ -2,13 +2,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/api/medicine_api_service.dart';
 
-
 class MedicineAutocompleteField extends StatefulWidget {
   final TextEditingController controller;
   const MedicineAutocompleteField({super.key, required this.controller});
 
   @override
-  State<MedicineAutocompleteField> createState() => _MedicineAutocompleteFieldState();
+  State<MedicineAutocompleteField> createState() =>
+      _MedicineAutocompleteFieldState();
 }
 
 class _MedicineAutocompleteFieldState extends State<MedicineAutocompleteField> {
@@ -55,7 +55,8 @@ class _MedicineAutocompleteFieldState extends State<MedicineAutocompleteField> {
                 ? const Padding(
                     padding: EdgeInsets.all(12),
                     child: SizedBox(
-                      height: 16, width: 16,
+                      height: 16,
+                      width: 16,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                   )
@@ -70,7 +71,10 @@ class _MedicineAutocompleteFieldState extends State<MedicineAutocompleteField> {
               color: Colors.white,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: Colors.grey.shade300),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 8)],
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08), blurRadius: 8)
+              ],
             ),
             child: ListView(
               shrinkWrap: true,
@@ -80,7 +84,8 @@ class _MedicineAutocompleteFieldState extends State<MedicineAutocompleteField> {
                   .map(
                     (s) => ListTile(
                       dense: true,
-                      leading: const Icon(Icons.medication_liquid, size: 18, color: Colors.grey),
+                      leading: const Icon(Icons.medication_liquid,
+                          size: 18, color: Colors.grey),
                       title: Text(s, style: const TextStyle(fontSize: 14)),
                       onTap: () {
                         widget.controller.text = s;

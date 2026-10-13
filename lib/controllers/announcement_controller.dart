@@ -17,7 +17,7 @@ class AnnouncementController extends ChangeNotifier {
       final raw = await _service.getAnnouncements();
       announcements = raw.map(Announcement.fromJson).toList();
     } catch (e) {
-      error = e.toString();
+      error = 'Advisories could not be loaded. Check your access and try again.';
     }
     isLoading = false;
     notifyListeners();

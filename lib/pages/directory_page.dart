@@ -15,20 +15,18 @@ class DirectoryPage extends StatefulWidget {
 class _DirectoryPageState extends State<DirectoryPage> {
   final _controller = DirectoryController();
   final _searchCtrl = TextEditingController();
-  final _focusNode = FocusNode(); 
+  final _focusNode = FocusNode();
   bool _hasAutoSearched = false;
 
   @override
   void initState() {
     super.initState();
     _controller.loadLocalUnits();
-    
-    
+
     _searchCtrl.addListener(() {
       _controller.loadPlaceSuggestions(_searchCtrl.text);
     });
-    
-    
+
     _focusNode.addListener(() {
       if (!_focusNode.hasFocus) {
         _controller.clearSuggestions();
@@ -62,7 +60,6 @@ class _DirectoryPageState extends State<DirectoryPage> {
       builder: (context, _) {
         return Column(
           children: [
-            
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
               child: Column(
@@ -83,7 +80,8 @@ class _DirectoryPageState extends State<DirectoryPage> {
                             prefixIcon: const Icon(Icons.search),
                             border: const OutlineInputBorder(),
                             suffixIcon: IconButton(
-                              icon: const Icon(Icons.my_location, color: AppConstants.redPrimary),
+                              icon: const Icon(Icons.my_location,
+                                  color: AppConstants.redPrimary),
                               tooltip: 'Near me',
                               onPressed: _controller.searchNearMe,
                             ),
@@ -101,7 +99,6 @@ class _DirectoryPageState extends State<DirectoryPage> {
                       ),
                     ],
                   ),
-                 
                   if (_controller.placeSuggestions.isNotEmpty)
                     Container(
                       margin: const EdgeInsets.only(top: 4),
@@ -109,7 +106,11 @@ class _DirectoryPageState extends State<DirectoryPage> {
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: Colors.grey.shade300),
-                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8)],
+                        boxShadow: [
+                          BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 8)
+                        ],
                       ),
                       child: ListView(
                         shrinkWrap: true,
@@ -117,8 +118,10 @@ class _DirectoryPageState extends State<DirectoryPage> {
                         children: _controller.placeSuggestions
                             .map((place) => ListTile(
                                   dense: true,
-                                  leading: const Icon(Icons.location_city, size: 20, color: Colors.grey),
-                                  title: Text(place, style: const TextStyle(fontSize: 14)),
+                                  leading: const Icon(Icons.location_city,
+                                      size: 20, color: Colors.grey),
+                                  title: Text(place,
+                                      style: const TextStyle(fontSize: 14)),
                                   onTap: () {
                                     _searchCtrl.text = place;
                                     _controller.searchByCity(place);
@@ -141,12 +144,13 @@ class _DirectoryPageState extends State<DirectoryPage> {
                 ),
               ),
             ),
-            
             Expanded(
               child: RefreshIndicator(
                 color: AppConstants.redPrimary,
                 onRefresh: () => _controller.searchByCity(
-                  _searchCtrl.text.trim().isEmpty ? 'Manila' : _searchCtrl.text.trim(),
+                  _searchCtrl.text.trim().isEmpty
+                      ? 'Manila'
+                      : _searchCtrl.text.trim(),
                 ),
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
@@ -155,10 +159,12 @@ class _DirectoryPageState extends State<DirectoryPage> {
                     if (_controller.localUnits.isNotEmpty) ...[
                       const _SectionHeader('Barangay Health Centers'),
                       ..._controller.localUnits.map(
-                        (u) => HealthUnitCard(unit: u, onCall: () => _call(u.phone)),
+                        (u) => HealthUnitCard(
+                            unit: u, onCall: () => _call(u.phone)),
                       ),
                     ],
-                    const _SectionHeader('Nearby Hospitals & Clinics (Nearest First)'),
+                    const _SectionHeader(
+                        'Nearby Hospitals & Clinics (Nearest First)'),
                     if (_controller.isLoading)
                       const Padding(
                         padding: EdgeInsets.all(32),
@@ -170,10 +176,12 @@ class _DirectoryPageState extends State<DirectoryPage> {
                         child: Center(
                           child: Column(
                             children: [
-                              Text(_controller.error!, textAlign: TextAlign.center),
+                              Text(_controller.error!,
+                                  textAlign: TextAlign.center),
                               const SizedBox(height: 8),
                               TextButton(
-                                onPressed: () => _controller.searchByCity('Manila'),
+                                onPressed: () =>
+                                    _controller.searchByCity('Manila'),
                                 child: const Text('Retry'),
                               ),
                             ],
@@ -184,14 +192,16 @@ class _DirectoryPageState extends State<DirectoryPage> {
                       const Padding(
                         padding: EdgeInsets.all(24),
                         child: Center(
-                          child: Text('Search a city or tap the location icon to find nearby facilities.'),
+                          child: Text(
+                              'Search a city or tap the location icon to find nearby facilities.'),
                         ),
                       )
                     else
                       ..._controller.hospitals.map(
                         (h) => HospitalCard(
                           hospital: h,
-                          onCall: h.phone == null ? null : () => _call(h.phone!),
+                          onCall:
+                              h.phone == null ? null : () => _call(h.phone!),
                         ),
                       ),
                   ],
@@ -213,7 +223,8 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      child: Text(text, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+      child: Text(text,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
     );
   }
 }

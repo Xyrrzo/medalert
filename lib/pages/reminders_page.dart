@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../controllers/reminder_controller.dart';
+import '../services/notification_service.dart';
 import '../utils/constants.dart';
 import '../widgets/medicine_autocomplete_field.dart';
 
@@ -34,6 +35,17 @@ class _RemindersPageState extends State<RemindersPage> {
     if (_titleCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter a medicine name.')),
+      );
+      return;
+    }
+    final notificationsAllowed =
+        await NotificationService.instance.requestPermission();
+    if (!mounted) return;
+    if (!notificationsAllowed) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Allow notifications in your device settings to receive reminders.'),
+        ),
       );
       return;
     }

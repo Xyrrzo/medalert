@@ -34,7 +34,7 @@ class ReminderController extends ChangeNotifier {
           .map((json) => Reminder.fromJson(json))
           .toList();
       
-      
+      // Schedule notifications for incomplete reminders
       for (final r in reminders.where((r) => !r.isDone)) {
         await NotificationService.instance.scheduleDaily(
           r.id,
@@ -65,7 +65,7 @@ class ReminderController extends ChangeNotifier {
     }
     
     try {
-      
+      // Create remind_at timestamp (today at selected time)
       final now = DateTime.now();
       final remindAt = DateTime(now.year, now.month, now.day, time.hour, time.minute);
       

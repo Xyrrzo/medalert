@@ -28,7 +28,8 @@ class AppointmentCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: _statusColor(appointment.status).withOpacity(0.15),
+          backgroundColor:
+              _statusColor(appointment.status).withValues(alpha: 0.15),
           child: Icon(Icons.event, color: _statusColor(appointment.status)),
         ),
         title: Text(
@@ -38,13 +39,15 @@ class AppointmentCard extends StatelessWidget {
             decoration: isCancelled ? TextDecoration.lineThrough : null,
           ),
         ),
-        subtitle: Text('${appointment.healthUnitName ?? ''}\n${appointment.date} at ${appointment.time} • ${appointment.status}'),
+        subtitle: Text(
+            '${appointment.healthUnitName ?? ''}\n${appointment.date} at ${appointment.time} • ${appointment.status}'),
         isThreeLine: true,
         trailing: isCancelled
             ? null
             : TextButton(
                 onPressed: onCancel,
-                child: const Text('Cancel', style: TextStyle(color: AppConstants.redPrimary)),
+                child: const Text('Cancel',
+                    style: TextStyle(color: AppConstants.redPrimary)),
               ),
       ),
     );

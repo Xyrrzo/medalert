@@ -21,7 +21,7 @@ class AppointmentController extends ChangeNotifier {
       final rawAppts = await _service.getAppointments();
       appointments = rawAppts.map(Appointment.fromJson).toList();
     } catch (e) {
-      error = e.toString();
+      error = 'Your request could not be completed. Check your access and try again.';
     }
     isLoading = false;
     notifyListeners();
@@ -51,7 +51,7 @@ class AppointmentController extends ChangeNotifier {
       await loadData();
       return true;
     } catch (e) {
-      error = e.toString();
+      error = 'This appointment could not be cancelled. Check your access and try again.';
       notifyListeners();
       return false;
     }

@@ -27,21 +27,22 @@ class HospitalCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: AppConstants.redPrimary.withOpacity(0.12),
+          backgroundColor: AppConstants.redPrimary.withValues(alpha: 0.12),
           child: Icon(_icon, color: AppConstants.redPrimary),
         ),
-        title: Text(hospital.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(hospital.name,
+            style: const TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('${hospital.type.toUpperCase()} • ${hospital.address}'),
             if (hospital.hours != null) Text(hospital.hours!),
-            
             if (hospital.distanceKm != null)
               Text(
                 hospital.distanceLabel,
                 style: TextStyle(
-                  color: hospital.distanceKm! < 2 ? Colors.green : Colors.orange,
+                  color:
+                      hospital.distanceKm! < 2 ? Colors.green : Colors.orange,
                   fontWeight: FontWeight.bold,
                   fontSize: 13,
                 ),
